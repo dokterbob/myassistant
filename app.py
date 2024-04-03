@@ -20,14 +20,15 @@ from llama_index.core.callbacks import CallbackManager
 logger = logging.getLogger()
 
 
-def get_index():
-    logger.info("Building index.")
-
+async def get_index():
     try:
-        # Load index
+        logger.info("Loading existing index from 'storage'.")
+
         storage_context = StorageContext.from_defaults(persist_dir="./storage")
         index = load_index_from_storage(storage_context)
     except FileNotFoundError:
+        logger.info("Building new index from 'data'.")
+
         # If data directory doesn't exist, create it with hello world txt
         if not os.path.exists("./data"):
             print("Creating data directory with hello_world.txt")
@@ -36,7 +37,7 @@ def get_index():
                 f.write("Hello, world!")
 
         # Build new index
-        documents = SimpleDirectoryReader("./data", recursive=True).load_data(
+        documents = await SimpleDirectoryReader("./data", recursive=True).aload_data(
             show_progress=True
         )
         index = VectorStoreIndex.from_documents(documents)
@@ -45,7 +46,7 @@ def get_index():
     return index
 
 
-def get_query_engine():
+async def get_query_engine():
     logger.info("Getting query engine.")
 
     Settings.llm = Anthropic(
@@ -57,7 +58,7 @@ def get_query_engine():
     callback_manager = CallbackManager([cl.LlamaIndexCallbackHandler()])
     Settings.callback_manager = callback_manager
 
-    index = get_index()
+    index = await get_index()
 
     return index.as_query_engine(streaming=True, similarity_top_k=2)
 
@@ -66,11 +67,11 @@ def get_query_engine():
 async def start():
     query_engine = get_query_engine()
 
-    cl.user_session.set("query_engine", query_engine)
-
     await cl.Message(
         author="Assistant", content="Hello! Im an AI assistant. How may I help you?"
     ).send()
+
+    cl.user_session.set("query_engine", await query_engine)
 
 
 @cl.on_message
