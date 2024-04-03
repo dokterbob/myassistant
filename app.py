@@ -11,11 +11,11 @@ from llama_index.core import (
     SimpleDirectoryReader,
     load_index_from_storage,
 )
+from llama_index.core.base.response.schema import AsyncStreamingResponse
 from llama_index.llms.anthropic import Anthropic
 from llama_index.embeddings.fastembed import FastEmbedEmbedding
 from llama_index.core.query_engine.retriever_query_engine import RetrieverQueryEngine
 from llama_index.core.callbacks import CallbackManager
-from llama_index.core.service_context import ServiceContext
 
 logger = logging.getLogger()
 
@@ -80,8 +80,9 @@ async def main(message: cl.Message):
 
     msg = cl.Message(content="", author="Assistant")
 
-    res = await cl.make_async(query_engine.query)(message.content)
+    res = await query_engine.aquery(message.content)
+    assert isinstance(res, AsyncStreamingResponse)
 
-    for token in res.response_gen:
+    async for token in res.async_response_gen:  # type: ignore
         await msg.stream_token(token)
     await msg.send()
