@@ -15,4 +15,4 @@ My Personal Assistant - opinionated LLM chat interface based on:
 5. Profit.
 
 ## Embeddings
-Documents you put in data will be embedded (this might take a while!).
+Documents you put in `data` will be embedded (this might take a while!) - at this point not yet incremental so throw out the `stroage` directory after you add documents.
