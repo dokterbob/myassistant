@@ -1,6 +1,5 @@
 import os
 import logging
-import sys
 import chainlit as cl
 
 
@@ -21,11 +20,16 @@ logger = logging.getLogger()
 
 
 async def get_index():
+    documents = SimpleDirectoryReader(
+        "./data", recursive=True, filename_as_id=True
+    ).aload_data()
+
     try:
         logger.info("Loading existing index from 'storage'.")
 
         storage_context = StorageContext.from_defaults(persist_dir="./storage")
         index = load_index_from_storage(storage_context)
+        index.refresh_ref_docs(await documents)
     except FileNotFoundError:
         logger.info("Building new index from 'data'.")
 
@@ -36,42 +40,45 @@ async def get_index():
             with open("./data/hello_world.txt", "w") as f:
                 f.write("Hello, world!")
 
-        # Build new index
-        documents = await SimpleDirectoryReader("./data", recursive=True).aload_data(
-            show_progress=True
-        )
-        index = VectorStoreIndex.from_documents(documents)
-        index.storage_context.persist()
+        index = VectorStoreIndex(await documents, show_progress=True, use_async=True)
+
+    index.storage_context.persist()
 
     return index
 
 
+# Memoize query_engine
+_query_engine = None
+
+
 async def get_query_engine():
+    global _query_engine
     logger.info("Getting query engine.")
 
-    Settings.llm = Anthropic(
-        model="claude-3-opus-20240229", temperature=0.1, max_tokens=1024
-    )
-    Settings.embed_model = FastEmbedEmbedding(model_name="thenlper/gte-large")
-    # Settings.context_window = 4096
+    if not _query_engine:
+        Settings.llm = Anthropic(
+            model="claude-3-opus-20240229", temperature=0.1, max_tokens=1024
+        )
+        Settings.embed_model = FastEmbedEmbedding(model_name="thenlper/gte-large")
+        Settings.context_window = 200 * 1024
 
-    callback_manager = CallbackManager([cl.LlamaIndexCallbackHandler()])
-    Settings.callback_manager = callback_manager
+        callback_manager = CallbackManager([cl.LlamaIndexCallbackHandler()])
+        Settings.callback_manager = callback_manager
 
-    index = await get_index()
+        index = await get_index()
 
-    return index.as_query_engine(streaming=True, similarity_top_k=2)
+        _query_engine = index.as_query_engine(streaming=True, similarity_top_k=10)
+
+    return _query_engine
 
 
 @cl.on_chat_start
 async def start():
-    query_engine = get_query_engine()
-
     await cl.Message(
         author="Assistant", content="Hello! Im an AI assistant. How may I help you?"
     ).send()
 
-    cl.user_session.set("query_engine", await query_engine)
+    cl.user_session.set("query_engine", await get_query_engine())
 
 
 @cl.on_message

@@ -37,16 +37,16 @@ latex = false
 
 # Allows user to use speech to text
 [features.speech_to_text]
-    enabled = false
+    enabled = true
     # See all languages here https://github.com/JamesBrill/react-speech-recognition/blob/HEAD/docs/API.md#language-string
     # language = "en-US"
 
 [UI]
 # Name of the app and chatbot.
-name = "Chatbot"
+name = "myassistant"
 
 # Show the readme while the thread is empty.
-show_readme_as_default = true
+show_readme_as_default = false
 
 # Description of the app and chatbot. This is used for HTML tags.
 # description = ""
@@ -61,7 +61,7 @@ default_expand_messages = false
 hide_cot = false
 
 # Link to your github repo. This will add a github button in the UI's header.
-# github = ""
+github = "https://github.com/dokterbob/myassistant"
 
 # Specify a CSS file that can be used to customize the user interface.
 # The CSS file can be served from the public directory or via an external link.
