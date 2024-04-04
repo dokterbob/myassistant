@@ -62,7 +62,7 @@ async def get_chat_engine():
 
     if not _chat_engine:
         Settings.llm = Anthropic(
-            model="claude-3-opus-20240229", temperature=0.1, max_tokens=4096
+            model="claude-3-sonnet-20240229", temperature=0.1, max_tokens=4096
         )
         Settings.embed_model = FastEmbedEmbedding(model_name="thenlper/gte-large")
         Settings.context_window = 200 * 1024
