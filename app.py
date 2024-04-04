@@ -10,11 +10,16 @@ from llama_index.core import (
     SimpleDirectoryReader,
     load_index_from_storage,
 )
+from llama_index.core.agent import AgentChatResponse
 from llama_index.core.base.response.schema import AsyncStreamingResponse
+from llama_index.core.chat_engine.types import (
+    BaseChatEngine,
+    StreamingAgentChatResponse,
+)
 from llama_index.llms.anthropic import Anthropic
 from llama_index.embeddings.fastembed import FastEmbedEmbedding
-from llama_index.core.query_engine.retriever_query_engine import RetrieverQueryEngine
 from llama_index.core.callbacks import CallbackManager
+from llama_index.core.memory import ChatMemoryBuffer
 
 logger = logging.getLogger()
 
@@ -47,15 +52,15 @@ async def get_index():
     return index
 
 
-# Memoize query_engine
-_query_engine = None
+# Memoize chat_engine
+_chat_engine = None
 
 
-async def get_query_engine():
-    global _query_engine
+async def get_chat_engine():
+    global _chat_engine
     logger.info("Getting query engine.")
 
-    if not _query_engine:
+    if not _chat_engine:
         Settings.llm = Anthropic(
             model="claude-3-opus-20240229", temperature=0.1, max_tokens=4096
         )
@@ -67,9 +72,13 @@ async def get_query_engine():
 
         index = await get_index()
 
-        _query_engine = index.as_query_engine(streaming=True, similarity_top_k=10)
+        memory = ChatMemoryBuffer.from_defaults(token_limit=10 * 1024)
 
-    return _query_engine
+        _chat_engine = index.as_chat_engine(
+            similarity_top_k=10, memory=memory, streaming=True
+        )
+
+    return _chat_engine
 
 
 @cl.on_chat_start
@@ -78,19 +87,19 @@ async def start():
         author="Assistant", content="Hello! Im an AI assistant. How may I help you?"
     ).send()
 
-    cl.user_session.set("query_engine", await get_query_engine())
+    cl.user_session.set("chat_engine", await get_chat_engine())
 
 
 @cl.on_message
 async def main(message: cl.Message):
-    query_engine = cl.user_session.get("query_engine")
-    assert isinstance(query_engine, RetrieverQueryEngine)
+    chat_engine = cl.user_session.get("chat_engine")
+    assert isinstance(chat_engine, BaseChatEngine)
 
     msg = cl.Message(content="", author="Assistant")
 
-    res = await query_engine.aquery(message.content)
-    assert isinstance(res, AsyncStreamingResponse)
+    res = await chat_engine.astream_chat(message.content)
+    assert isinstance(res, StreamingAgentChatResponse)
 
-    async for token in res.async_response_gen:  # type: ignore
+    async for token in res.async_response_gen():
         await msg.stream_token(token)
     await msg.send()
