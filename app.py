@@ -57,7 +57,7 @@ async def get_query_engine():
 
     if not _query_engine:
         Settings.llm = Anthropic(
-            model="claude-3-opus-20240229", temperature=0.1, max_tokens=1024
+            model="claude-3-opus-20240229", temperature=0.1, max_tokens=4096
         )
         Settings.embed_model = FastEmbedEmbedding(model_name="thenlper/gte-large")
         Settings.context_window = 200 * 1024
